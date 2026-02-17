@@ -1,0 +1,7 @@
+{
+  "name": "GreenBuild - Office Material Procurement",
+  "description": "A smart marketplace for ordering office supplies with an integrated environmental impact tracking system, admin approval workflow, and automated green office reporting.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
