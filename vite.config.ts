@@ -21,3 +21,10 @@ export default defineConfig(({ mode }) => {
       }
     };
 });
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  base: '/GreenBuild/', // ต้องตรงกับชื่อ Repository ของคุณ
+})
