@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { OrderItem, OrderStatus, GreenLabel } from '../types';
 
 interface ShopViewProps {
@@ -17,9 +16,9 @@ const DEPARTMENTS = [
 ];
 
 const ShopView: React.FC<ShopViewProps> = ({ onCreateOrder, onAddToCart }) => {
-  // User Info State
-  const [userName, setUserName] = useState('');
-  const [department, setDepartment] = useState(DEPARTMENTS[0]);
+  // --- ส่วนที่แก้ไข: ดึงค่าจาก LocalStorage มาเป็นค่าเริ่มต้น ---
+  const [userName, setUserName] = useState(localStorage.getItem('greenbuild_user_name') || '');
+  const [department, setDepartment] = useState(localStorage.getItem('greenbuild_department') || DEPARTMENTS[0]);
 
   // Form State
   const [productName, setProductName] = useState('');
@@ -32,6 +31,12 @@ const ShopView: React.FC<ShopViewProps> = ({ onCreateOrder, onAddToCart }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitType, setSubmitType] = useState<'DIRECT' | 'CART'>('DIRECT');
+
+  // --- ส่วนที่แก้ไข: บันทึกชื่อ/แผนก ทุกครั้งที่เปลี่ยน ---
+  useEffect(() => {
+    localStorage.setItem('greenbuild_user_name', userName);
+    localStorage.setItem('greenbuild_department', department);
+  }, [userName, department]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -62,19 +67,22 @@ const ShopView: React.FC<ShopViewProps> = ({ onCreateOrder, onAddToCart }) => {
     setIsSubmitting(true);
     setShowConfirm(false);
     
-    const newItem: OrderItem = {
+    // --- ส่วนที่แก้ไข: เปลี่ยนชื่อ Key ให้ตรงกับ Google Sheets (name, amount) ---
+    const newItem: any = {
       id: `ORD-${Date.now()}`,
       productId: 'MANUAL-ENTRY',
-      productName: productName.trim(),
-      quantity: Number(quantity),
+      name: productName.trim(), // ส่งไปที่คอลัมน์ name ใน Sheets
+      amount: Number(quantity),  // ส่งไปที่คอลัมน์ amount ใน Sheets
+      unit: unit.trim(),
       isGreen,
       greenLabel: isGreen ? greenLabel : undefined,
       imageAttachment: image || undefined,
       requestedAt: new Date().toISOString(),
       status: OrderStatus.PENDING,
-      userId: 'U001', // Fixed for this session, but name is dynamic
+      userId: department, 
       userName: userName.trim(),
-      department: department
+      department: department,
+      category: isGreen ? 'GREEN' : 'NORMAL'
     };
 
     setTimeout(() => {
@@ -84,7 +92,6 @@ const ShopView: React.FC<ShopViewProps> = ({ onCreateOrder, onAddToCart }) => {
         onAddToCart(newItem);
       }
       
-      // Reset Item Form only (Keep user info for convenience)
       setProductName('');
       setDescription('');
       setQuantity(1);
@@ -118,7 +125,7 @@ const ShopView: React.FC<ShopViewProps> = ({ onCreateOrder, onAddToCart }) => {
                   type="text" 
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
-                  placeholder=""
+                  placeholder="กรอกชื่อของคุณ"
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all"
                   required
                 />
