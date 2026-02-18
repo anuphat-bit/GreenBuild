@@ -1,188 +1,106 @@
-
 import React, { useState, useEffect } from 'react';
-import { ViewType, OrderItem } from './types';
-import { MOCK_ORDERS } from './constants';
 import Header from './components/Header';
 import ShopView from './components/ShopView';
-import UserOrdersView from './components/UserOrdersView';
 import CartView from './components/CartView';
-import AdminLogin from './components/AdminLogin';
+import UserOrdersView from './components/UserOrdersView';
 import AdminDashboard from './components/AdminDashboard';
-import AdminReports from './components/AdminReports';
+import { OrderItem, OrderStatus } from './types';
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<ViewType>('USER_SHOP');
-  const [orders, setOrders] = useState<OrderItem[]>(MOCK_ORDERS);
-  const [cart, setCart] = useState<OrderItem[]>([]);
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
+  const [currentView, setCurrentView] = useState<'SHOP' | 'CART' | 'USER_ORDERS' | 'ADMIN'>('SHOP');
+  const [cart, setCart] = useState<OrderItem[]>(() => {
+    const saved = localStorage.getItem('greenbuild_cart');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [orders, setOrders] = useState<OrderItem[]>(() => {
+    const saved = localStorage.getItem('greenbuild_orders');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   useEffect(() => {
-    const savedOrders = localStorage.getItem('greenbuild_orders');
-    if (savedOrders) {
-      try {
-        setOrders(JSON.parse(savedOrders));
-      } catch (e) {
-        console.error("Failed to parse orders", e);
-      }
-    }
-    const savedCart = localStorage.getItem('greenbuild_cart');
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch (e) {
-        console.error("Failed to parse cart", e);
-      }
-    }
-    // ตรวจสอบ Session เมื่อโหลดหน้าใหม่
-    const auth = sessionStorage.getItem('admin_auth');
-    if (auth === 'true') {
-      setIsAdminAuthenticated(true);
-    }
-  }, []);
+    localStorage.setItem('greenbuild_cart', JSON.stringify(cart));
+  }, [cart]);
 
-  const handleAdminLogin = (id: string, code: string): boolean => {
-    // ยืนยันรหัสผ่านแบบ Case-sensitive (ตัวพิมพ์เล็ก/ใหญ่มีผล)
-    // ID: admin, Code: green1234
-    if (id === 'admin' && code === 'green1234') {
-      setIsAdminAuthenticated(true);
-      sessionStorage.setItem('admin_auth', 'true');
-      setCurrentView('ADMIN_DASHBOARD');
-      return true;
-    }
-    return false;
-  };
-
-  const handleAdminLogout = () => {
-    setIsAdminAuthenticated(false);
-    sessionStorage.removeItem('admin_auth');
-    setCurrentView('USER_SHOP');
+  // --- ส่วนแก้ไข: ตรวจสอบการรับค่าชื่อสินค้า (item.name) ---
+  const handleAddToCart = (item: OrderItem) => {
+    setCart(prev => [...prev, item]);
+    alert(`เพิ่ม "${item.name}" ลงในตะกร้าแล้ว`);
   };
 
   const handleCreateOrder = (newOrders: OrderItem[]) => {
-    const updated = [...orders, ...newOrders];
-    setOrders(updated);
-    localStorage.setItem('greenbuild_orders', JSON.stringify(updated));
+    const updatedOrders = [...orders, ...newOrders];
+    setOrders(updatedOrders);
+    localStorage.setItem('greenbuild_orders', JSON.stringify(updatedOrders));
+    
+    // ส่งข้อมูลไป Google Sheets ทันที (กรณีสั่งซื้อทันที)
+    sendToGoogleSheets(newOrders);
     setCurrentView('USER_ORDERS');
   };
 
-  const handleAddToCart = (item: OrderItem) => {
-    const updated = [...cart, item];
-    setCart(updated);
-    localStorage.setItem('greenbuild_cart', JSON.stringify(updated));
-  };
-
-  const handleRemoveFromCart = (id: string) => {
-    const updated = cart.filter(item => item.id !== id);
-    setCart(updated);
-    localStorage.setItem('greenbuild_cart', JSON.stringify(updated));
-  };
-
- const handleCheckout = async () => {
+  const handleCheckout = async () => {
     if (cart.length === 0) return;
+    await sendToGoogleSheets(cart);
+    
+    const updatedOrders = [...orders, ...cart];
+    setOrders(updatedOrders);
+    localStorage.setItem('greenbuild_orders', JSON.stringify(updatedOrders));
+    setCart([]);
+    setCurrentView('USER_ORDERS');
+  };
 
+  const sendToGoogleSheets = async (items: OrderItem[]) => {
     try {
       await fetch('https://sheetdb.io/api/v1/0zxc9i3e6gg1z', {
         method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          data: cart.map(item => ({
+          data: items.map(item => ({
             id: item.id,
             timestamp: new Date().toLocaleString('th-TH'),
             userName: item.userName,
-            userId: item.department, // ใช้แผนกเป็นข้อมูลระบุตัวตนในตาราง
-            name: item.name,        // แก้ให้ตรงกับ ShopView
-            amount: item.amount,    // แก้ให้ตรงกับ ShopView
+            userId: item.department,
+            name: item.name, // ชื่อสินค้า
+            amount: item.amount,
             unit: item.unit,
-            category: item.category || 'NORMAL',
+            category: item.isGreen ? 'GREEN' : 'NORMAL',
             status: 'PENDING'
           }))
         })
       });
-      console.log("SheetDB: ส่งข้อมูลสำเร็จ");
     } catch (error) {
       console.error("SheetDB Error:", error);
     }
-
-    const updatedOrders = [...orders, ...cart];
-    setOrders(updatedOrders);
-    localStorage.setItem('greenbuild_orders', JSON.stringify(updatedOrders));
-    setCart([]);
-    localStorage.removeItem('greenbuild_cart');
-    setCurrentView('USER_ORDERS');
-  };
-      });
-    } catch (error) {
-      console.error("SheetDB Error:", error);
-    }
-
-    // เคลียร์ตะกร้าและอัปเดตสถานะในหน้าเว็บ
-    const updatedOrders = [...orders, ...cart];
-    setOrders(updatedOrders);
-    localStorage.setItem('greenbuild_orders', JSON.stringify(updatedOrders));
-    setCart([]);
-    localStorage.removeItem('greenbuild_cart');
-    setCurrentView('USER_ORDERS');
   };
 
-  const handleUpdateOrder = (orderId: string, updates: Partial<OrderItem>) => {
-    const updated = orders.map(o => o.id === orderId ? { ...o, ...updates } : o);
+  const updateOrderStatus = (orderId: string, status: OrderStatus) => {
+    const updated = orders.map(o => o.id === orderId ? { ...o, status } : o);
     setOrders(updated);
     localStorage.setItem('greenbuild_orders', JSON.stringify(updated));
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen bg-gray-50">
       <Header 
-        currentView={currentView} 
+        cartCount={cart.length} 
         onNavigate={setCurrentView} 
-        isAdmin={isAdminAuthenticated} 
-        onLogout={handleAdminLogout}
-        cartCount={cart.length}
+        currentView={currentView}
       />
-      
-      <main className="flex-grow container mx-auto px-4 py-6">
-        {currentView === 'USER_SHOP' && (
-          <ShopView 
-            onCreateOrder={handleCreateOrder} 
-            onAddToCart={handleAddToCart}
-          />
+      <main className="container mx-auto px-4 py-8">
+        {currentView === 'SHOP' && (
+          <ShopView onAddToCart={handleAddToCart} onCreateOrder={handleCreateOrder} />
         )}
-        
-        {currentView === 'USER_CART' && (
+        {currentView === 'CART' && (
           <CartView 
-            cartItems={cart} 
-            onRemoveItem={handleRemoveFromCart}
+            items={cart} 
+            onRemove={(id) => setCart(cart.filter(i => i.id !== id))}
             onCheckout={handleCheckout}
-            onContinueShopping={() => setCurrentView('USER_SHOP')}
           />
         )}
-
-        {currentView === 'USER_ORDERS' && (
-          <UserOrdersView orders={orders.filter(o => o.userId === 'U001')} />
-        )}
-
-        {currentView === 'ADMIN_LOGIN' && (
-          <AdminLogin 
-            onLogin={handleAdminLogin} 
-            onBack={() => setCurrentView('USER_SHOP')} 
-          />
-        )}
-        
-        {currentView === 'ADMIN_DASHBOARD' && isAdminAuthenticated && (
-          <AdminDashboard orders={orders} onUpdateOrder={handleUpdateOrder} />
-        )}
-
-        {currentView === 'ADMIN_REPORTS' && isAdminAuthenticated && (
-          <AdminReports orders={orders} />
+        {currentView === 'USER_ORDERS' && <UserOrdersView orders={orders} />}
+        {currentView === 'ADMIN' && (
+          <AdminDashboard orders={orders} onUpdateStatus={updateOrderStatus} />
         )}
       </main>
-
-      <footer className="bg-white border-t py-4 text-center text-gray-500 text-sm">
-        © 2026 GreenBuild - Office Material Procurement System.
-      </footer>
     </div>
   );
 };
