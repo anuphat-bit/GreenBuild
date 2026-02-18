@@ -77,10 +77,9 @@ const App: React.FC = () => {
     localStorage.setItem('greenbuild_cart', JSON.stringify(updated));
   };
 
-  const handleCheckout = async () => {
+ const handleCheckout = async () => {
     if (cart.length === 0) return;
 
-    // ส่งข้อมูลไป Google Sheets ผ่าน SheetDB
     try {
       await fetch('https://sheetdb.io/api/v1/0zxc9i3e6gg1z', {
         method: 'POST',
@@ -91,16 +90,29 @@ const App: React.FC = () => {
         body: JSON.stringify({
           data: cart.map(item => ({
             id: item.id,
-            name: item.name,
-            amount: item.amount,
-            unit: item.unit,
-            category: item.category,
-            status: item.status,
-            userId: item.userId,
+            timestamp: new Date().toLocaleString('th-TH'),
             userName: item.userName,
-            timestamp: new Date().toLocaleString('th-TH')
+            userId: item.department, // ใช้แผนกเป็นข้อมูลระบุตัวตนในตาราง
+            name: item.name,        // แก้ให้ตรงกับ ShopView
+            amount: item.amount,    // แก้ให้ตรงกับ ShopView
+            unit: item.unit,
+            category: item.category || 'NORMAL',
+            status: 'PENDING'
           }))
         })
+      });
+      console.log("SheetDB: ส่งข้อมูลสำเร็จ");
+    } catch (error) {
+      console.error("SheetDB Error:", error);
+    }
+
+    const updatedOrders = [...orders, ...cart];
+    setOrders(updatedOrders);
+    localStorage.setItem('greenbuild_orders', JSON.stringify(updatedOrders));
+    setCart([]);
+    localStorage.removeItem('greenbuild_cart');
+    setCurrentView('USER_ORDERS');
+  };
       });
     } catch (error) {
       console.error("SheetDB Error:", error);
