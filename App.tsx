@@ -77,8 +77,36 @@ const App: React.FC = () => {
     localStorage.setItem('greenbuild_cart', JSON.stringify(updated));
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (cart.length === 0) return;
+
+    // ส่งข้อมูลไป Google Sheets ผ่าน SheetDB
+    try {
+      await fetch('https://sheetdb.io/api/v1/0zxc9i3e6gg1z', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          data: cart.map(item => ({
+            id: item.id,
+            name: item.name,
+            amount: item.amount,
+            unit: item.unit,
+            category: item.category,
+            status: item.status,
+            userId: item.userId,
+            userName: item.userName,
+            timestamp: new Date().toLocaleString('th-TH')
+          }))
+        })
+      });
+    } catch (error) {
+      console.error("SheetDB Error:", error);
+    }
+
+    // เคลียร์ตะกร้าและอัปเดตสถานะในหน้าเว็บ
     const updatedOrders = [...orders, ...cart];
     setOrders(updatedOrders);
     localStorage.setItem('greenbuild_orders', JSON.stringify(updatedOrders));
