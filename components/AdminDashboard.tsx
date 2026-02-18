@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { OrderItem, OrderStatus } from '../types';
 
@@ -22,7 +21,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, onUpdateOrder }
     return orders.filter(order => {
       const matchStatus = statusFilter === 'ALL' || order.status === statusFilter;
       
-      const orderDate = new Date(order.requestedAt).getTime();
+      // ตรวจสอบวันที่สั่งซื้อ (ถ้าไม่มีใช้เวลาปัจจุบันแทนเพื่อไม่ให้ Build พัง)
+      const orderDate = new Date(order.requestedAt || Date.now()).getTime();
       const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
       const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
       
@@ -30,19 +30,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, onUpdateOrder }
       const matchEnd = end ? orderDate <= end : true;
 
       const query = searchQuery.toLowerCase().trim();
+      // ✅ แก้จุดที่ 1: เปลี่ยนจาก productName เป็น name
       const matchSearch = query === '' || 
-        order.productName.toLowerCase().includes(query) || 
-        order.userName.toLowerCase().includes(query) ||
-        order.department.toLowerCase().includes(query) ||
-        order.id.toLowerCase().includes(query);
+        (order.name && order.name.toLowerCase().includes(query)) || 
+        (order.userName && order.userName.toLowerCase().includes(query)) ||
+        (order.department && order.department.toLowerCase().includes(query)) ||
+        (order.id && order.id.toLowerCase().includes(query));
       
       return matchStatus && matchStart && matchEnd && matchSearch;
-    }).sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+    }).sort((a, b) => new Date(b.requestedAt || 0).getTime() - new Date(a.requestedAt || 0).getTime());
   }, [orders, statusFilter, startDate, endDate, searchQuery]);
 
   const handleProcessOrder = (order: OrderItem) => {
     setSelectedOrder(order);
-    setFinalPrice(order.finalPrice?.toString() || '');
+    // ตรวจสอบว่ามีราคาไหม ถ้าไม่มีใส่ค่าว่าง
+    setFinalPrice(order.finalPrice ? order.finalPrice.toString() : '');
     setComment(order.adminComment || '');
   };
 
@@ -141,15 +143,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, onUpdateOrder }
               <tr key={order.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4">
                   <div className="font-bold text-gray-800">{order.id}</div>
-                  <div className="text-[10px] text-gray-400 uppercase">{new Date(order.requestedAt).toLocaleDateString('th-TH')}</div>
+                  <div className="text-[10px] text-gray-400 uppercase">
+                    {order.requestedAt ? new Date(order.requestedAt).toLocaleDateString('th-TH') : 'ไม่ระบุวันที่'}
+                  </div>
                 </td>
                 <td className="px-6 py-4">
                   <div className="font-bold text-gray-800">👤 {order.userName}</div>
                   <div className="text-xs text-blue-600 font-medium">🏢 {order.department}</div>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="font-medium text-gray-800">{order.productName}</div>
-                  <div className="text-xs text-gray-500">จำนวน: {order.quantity}</div>
+                  {/* ✅ แก้จุดที่ 2: เปลี่ยนจาก productName เป็น name และ quantity เป็น amount */}
+                  <div className="font-medium text-gray-800">{order.name}</div>
+                  <div className="text-xs text-gray-500">จำนวน: {order.amount} {order.unit}</div>
                 </td>
                 <td className="px-6 py-4">
                   <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${getStatusBadgeClass(order.status)}`}>
@@ -187,11 +192,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, onUpdateOrder }
               
               <div className="p-4 bg-gray-50 rounded-2xl border">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">วัสดุที่ต้องการ</label>
-                <div className="text-xl font-bold text-gray-800">{selectedOrder.productName}</div>
-                <div className="text-sm text-gray-600">จำนวนที่ขอ: {selectedOrder.quantity}</div>
+                {/* ✅ แก้จุดที่ 3: เปลี่ยนจาก productName เป็น name และ quantity เป็น amount */}
+                <div className="text-xl font-bold text-gray-800">{selectedOrder.name}</div>
+                <div className="text-sm text-gray-600">จำนวนที่ขอ: {selectedOrder.amount} {selectedOrder.unit}</div>
                 {selectedOrder.isGreen && (
                   <div className="mt-2 text-xs font-bold text-green-600 flex items-center gap-1">
-                    🌱 {selectedOrder.greenLabel}
+                    🌱 วัสดุรักษ์โลก
                   </div>
                 )}
               </div>
