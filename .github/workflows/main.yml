@@ -18,7 +18,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          # ลบ cache: 'npm' ออกแล้วเพื่อให้ Build ผ่านโดยไม่ต้องมี package-lock.json
 
       - name: Install dependencies
         run: npm install
