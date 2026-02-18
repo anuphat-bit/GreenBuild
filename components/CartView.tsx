@@ -8,50 +8,112 @@ interface CartViewProps {
 }
 
 const CartView: React.FC<CartViewProps> = ({ items, onRemove, onCheckout }) => {
+  // คำนวณจำนวนรายการทั้งหมด
+  const totalItems = items.length;
+  // กรองรายการที่เป็นวัสดุรักษ์โลก
+  const greenItemsCount = items.filter(item => item.isGreen).length;
+
   if (items.length === 0) {
     return (
-      <div className="max-w-2xl mx-auto text-center py-20 bg-white rounded-3xl shadow-sm border border-gray-100">
-        <div className="text-6xl mb-4">🛒</div>
-        <h2 className="text-xl font-bold text-gray-800">ไม่มีสินค้าในตะกร้า</h2>
+      <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+        <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center text-5xl mb-4">🛒</div>
+        <h2 className="text-2xl font-bold text-gray-800">ตะกร้าของคุณยังว่างอยู่</h2>
+        <p className="mt-2 text-gray-400">เลือกวัสดุที่คุณต้องการสั่งซื้อจากหน้าหลักได้เลย</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-2 space-y-4">
-        <h2 className="text-2xl font-bold mb-4">ตะกร้าของคุณ</h2>
-        {items.map((item) => (
-          <div key={item.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-            <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-2xl ${item.isGreen ? 'bg-green-50' : 'bg-gray-50'}`}>
-              {item.isGreen ? '🌱' : '📦'}
-            </div>
-            <div className="flex-1">
-              {/* ตรวจสอบว่าใช้ item.name และ item.amount */}
-              <h3 className="font-bold text-gray-800 text-lg">
-                {item.name || "ไม่ระบุชื่อสินค้า"}
-              </h3>
-              <p className="text-sm text-gray-500">
-                จำนวน: <span className="font-bold text-gray-700">{item.amount || 0}</span> {item.unit || 'หน่วย'}
-              </p>
-              <div className="text-[10px] text-blue-500 mt-1 uppercase font-medium">
-                {item.department}
-              </div>
-            </div>
-            <button onClick={() => onRemove(item.id)} className="p-2 text-gray-300 hover:text-red-500 transition-colors">🗑️</button>
-          </div>
-        ))}
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="text-2xl font-bold text-gray-800">ตะกร้าของคุณ ({totalItems})</h1>
+        <button 
+          onClick={() => window.location.reload()} // หรือใช้ navigation เพื่อกลับหน้า Shop
+          className="text-sm text-green-600 font-bold hover:underline"
+        >
+          + เพิ่มรายการอื่น
+        </button>
       </div>
 
-      <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-xl h-fit">
-        <h3 className="text-lg font-bold mb-4">สรุปการสั่งซื้อ</h3>
-        <div className="flex justify-between mb-6">
-          <span className="text-gray-500">รายการทั้งหมด</span>
-          <span className="font-bold">{items.length} รายการ</span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* รายการสินค้าในตะกร้า */}
+        <div className="lg:col-span-2 space-y-4">
+          {items.map((item) => (
+            <div 
+              key={item.id} 
+              className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md transition-shadow"
+            >
+              {/* รูปภาพจำลอง */}
+              <div className="w-20 h-20 bg-amber-50 rounded-2xl flex items-center justify-center text-3xl">
+                📦
+              </div>
+
+              {/* รายละเอียดสินค้า */}
+              <div className="flex-1">
+                <div className="flex justify-between items-start">
+                  <div>
+                    {/* ใช้ item.name แทน productName */}
+                    <h3 className="font-bold text-gray-800 text-lg">{item.name}</h3>
+                    <p className="text-sm text-gray-500">
+                      จำนวน: <span className="font-bold text-gray-800">{item.amount}</span> {item.unit}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => onRemove(item.id)}
+                    className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                    title="ลบรายการ"
+                  >
+                    🗑️
+                  </button>
+                </div>
+                
+                {item.isGreen && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-600 rounded-full text-[10px] font-bold border border-green-100 uppercase tracking-wider">
+                    🌱 Green Choice
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
-        <button onClick={onCheckout} className="w-full py-4 bg-green-600 text-white font-bold rounded-2xl shadow-lg hover:bg-green-700 active:scale-95 transition-all">
-          ยืนยันการสั่งซื้อ
-        </button>
+
+        {/* ส่วนสรุปคำสั่งซื้อ */}
+        <div className="lg:col-span-1">
+          <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100 sticky top-8 space-y-6">
+            <h2 className="text-xl font-bold text-gray-800">สรุปคำสั่งซื้อ</h2>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between text-gray-500 text-sm">
+                <span>รายการทั้งหมด</span>
+                <span className="font-bold text-gray-800">{totalItems} รายการ</span>
+              </div>
+              <div className="flex justify-between text-gray-500 text-sm">
+                <span>วัสดุรักษ์โลก</span>
+                <span className="font-bold text-green-600">{greenItemsCount} รายการ</span>
+              </div>
+              <hr className="border-dashed my-4" />
+              <div className="flex justify-between items-center">
+                <span className="text-gray-800 font-bold">ยอดรวมเบื้องต้น</span>
+                <div className="text-right">
+                  <div className="text-xs text-gray-400">รอแอดมินยืนยัน</div>
+                  <div className="text-xl font-black text-green-600">ราคา</div>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onClick={onCheckout}
+              className="w-full py-4 bg-green-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-green-100 hover:bg-green-700 hover:-translate-y-1 transition-all active:scale-95"
+            >
+              สั่งซื้อทั้งหมด ({totalItems})
+            </button>
+
+            <p className="text-[10px] text-gray-400 text-center leading-relaxed">
+              * ข้อมูลจะถูกบันทึกลงในระบบจัดซื้อกลาง<br />
+              เพื่อรอแอดมินดำเนินการตรวจสอบและแจ้งราคาในภายหลัง
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
