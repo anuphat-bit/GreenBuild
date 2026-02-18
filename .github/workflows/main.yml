@@ -18,7 +18,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          # ลบทั้ง cache และตัวแปรที่ค้างอยู่ออกหมดแล้ว
+          # ลบ cache ออกทั้งหมดเพื่อป้องกันปัญหาหาไฟล์ lock ไม่เจอ
 
       - name: Install dependencies
         run: npm install
