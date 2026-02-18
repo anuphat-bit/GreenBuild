@@ -3,162 +3,98 @@ import { OrderItem, OrderStatus } from '../types';
 
 interface ShopViewProps {
   onAddToCart: (item: OrderItem) => void;
-  onCreateOrder: (orders: OrderItem[]) => void;
+  onCreateOrder: (item: OrderItem) => void;
 }
 
-const ShopView: React.FC<ShopViewProps> = ({ onAddToCart, onCreateOrder }) => {
-  const [productName, setProductName] = useState('');
-  const [quantity, setQuantity] = useState<number>(1); // เพิ่ม state สำหรับจำนวน
-  const [unit, setUnit] = useState('ชิ้น');
-  const [imageFile, setImageFile] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+// ข้อมูลวัสดุตัวอย่าง (คุณสามารถเพิ่มหรือแก้ไขรายการตรงนี้ได้)
+const AVAILABLE_PRODUCTS = [
+  { id: 'P1', name: 'กระดาษ A4 80 แกรม', unit: 'รีม', isGreen: true },
+  { id: 'P2', name: 'ปากกาลูกลื่น น้ำเงิน', unit: 'โหล', isGreen: false },
+  { id: 'P3', name: 'ยางลบ', unit: 'ก้อน', isGreen: false },
+  { id: 'P4', name: 'ซองเอกสารน้ำตาล', unit: 'แพ็ค', isGreen: true },
+];
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImageFile(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+const ShopView: React.FC<ShopViewProps> = ({ onAddToCart, onCreateOrder }) => {
+  const [quantities, setQuantities] = useState<{ [key: string]: number }>({});
+
+  const handleQuantityChange = (id: string, value: number) => {
+    if (value < 1) return;
+    setQuantities(prev => ({ ...prev, [id]: value }));
   };
 
-  const handleSubmit = async (type: 'CART' | 'DIRECT') => {
-    if (!productName) {
-      alert("กรุณาระบุชื่อสินค้า");
-      return;
-    }
-
-    let uploadedImageUrl = "";
-    setIsUploading(true);
-
-    if (imageFile) {
-      try {
-        // ใช้โหมด no-cors เพื่อเลี่ยงปัญหาความปลอดภัยเบื้องต้น หรือตรวจสอบ Script URL อีกครั้ง
-        const response = await fetch('https://script.google.com/macros/s/AKfycby83_xi262iSGQUnadikpkj38iTwOLwvmePGxCLCirN8mwpneZZKXYG7fn3UVtcvQyh/exec', {
-          method: 'POST',
-          mode: 'no-cors', // เพิ่มโหมดนี้หากติดปัญหา CORS
-          headers: { 'Content-Type': 'text/plain' }, 
-          body: JSON.stringify({
-            image: imageFile,
-            fileName: `img_${Date.now()}.png`
-          })
-        });
-        // หมายเหตุ: เมื่อใช้ no-cors จะอ่าน response.json() ไม่ได้ แต่รูปจะเข้า Drive ปกติ
-        // หากต้องการ URL กลับมา ต้องตั้งค่าที่ Apps Script ให้รองรับ Options/CORS
-      } catch (error) {
-        console.error("Upload error:", error);
-      }
-    }
-
-    const newItem: OrderItem = {
-      id: `ORD-${Date.now()}`,
-      userName: localStorage.getItem('greenbuild_user_name') || 'ไม่ระบุชื่อ',
-      department: localStorage.getItem('greenbuild_department') || 'ไม่ระบุแผนก',
-      name: productName.trim(), // ตรวจสอบว่าใน types.ts ใช้ 'name' หรือ 'productName'
-      amount: Number(quantity), // ตรวจสอบว่าใน types.ts ใช้ 'amount' หรือ 'quantity'
-      unit: unit,
-      isGreen: true,
-      imageAttachment: uploadedImageUrl,
-      requestedAt: new Date().toISOString(),
-      status: OrderStatus.PENDING
+  const prepareOrderItem = (product: typeof AVAILABLE_PRODUCTS[0]): OrderItem => {
+    const amount = quantities[product.id] || 1;
+    return {
+      id: `ITEM-${Date.now()}-${product.id}`,
+      name: product.name,      // เปลี่ยนจาก productName เป็น name
+      amount: amount,          // เปลี่ยนจาก quantity เป็น amount
+      unit: product.unit,
+      isGreen: product.isGreen,
+      status: OrderStatus.PENDING,
+      userName: '',            // จะถูกเติมใน App.tsx
+      department: '',          // จะถูกเติมใน App.tsx
+      requestedAt: new Date().toISOString()
     };
-
-    if (type === 'CART') onAddToCart(newItem);
-    else onCreateOrder([newItem]);
-    
-    setIsUploading(false);
-    setProductName('');
-    setQuantity(1);
-    setImageFile(null);
-    alert("บันทึกข้อมูลเรียบร้อย!");
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white rounded-3xl shadow-sm border border-gray-100 animate-in fade-in duration-500">
-      <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-        <span>📦</span> รายละเอียดรายการวัสดุ
-      </h2>
-      
-      <div className="space-y-6">
-        {/* ชื่อสินค้า */}
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อวัสดุ / สินค้า *</label>
-          <input 
-            type="text" 
-            placeholder="เช่น กระดาษ A4, หมึกพิมพ์" 
-            className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 transition-all"
-            value={productName}
-            onChange={(e) => setProductName(e.target.value)}
-          />
+          <h1 className="text-3xl font-black text-gray-800">เลือกซื้อวัสดุ</h1>
+          <p className="text-gray-500">เลือกวัสดุอุปกรณ์สำนักงานที่คุณต้องการ</p>
         </div>
+      </div>
 
-        {/* จำนวน และ หน่วย */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">จำนวน *</label>
-            <input 
-              type="number" 
-              min="1"
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 transition-all"
-              value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">หน่วยนับ</label>
-            <input 
-              type="text" 
-              placeholder="รีม, กล่อง, ชิ้น"
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-green-500 transition-all"
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-            />
-          </div>
-        </div>
-        
-        {/* อัปโหลดรูปภาพ */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">ภาพประกอบ</label>
-          <div className="border-2 border-dashed border-gray-200 rounded-3xl p-8 text-center bg-gray-50/50 hover:bg-gray-50 transition-colors relative">
-            <input 
-              type="file" 
-              accept="image/*" 
-              id="file-upload" 
-              className="hidden" 
-              onChange={handleFileChange}
-            />
-            <label htmlFor="file-upload" className="cursor-pointer">
-              <div className="text-4xl mb-2">📸</div>
-              <p className="text-gray-500 font-medium">{imageFile ? "เปลี่ยนรูปภาพ" : "กดเพื่ออัปโหลดรูปภาพ"}</p>
-              {imageFile && (
-                <div className="mt-4">
-                  <img src={imageFile} alt="preview" className="max-h-32 mx-auto rounded-lg shadow-md" />
-                  <p className="text-xs text-green-600 mt-2">✨ เตรียมพร้อมอัปโหลด</p>
-                </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {AVAILABLE_PRODUCTS.map((product) => (
+          <div key={product.id} className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 flex flex-col">
+            <div className="w-full aspect-square bg-gray-50 rounded-2xl mb-4 flex items-center justify-center text-5xl relative">
+              📦
+              {product.isGreen && (
+                <span className="absolute top-3 right-3 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-sm">
+                  🌱 GREEN
+                </span>
               )}
-            </label>
-          </div>
-        </div>
+            </div>
 
-        {/* ปุ่มกดยืนยัน */}
-        <div className="flex gap-4 pt-4">
-          <button 
-            disabled={isUploading}
-            onClick={() => handleSubmit('CART')}
-            className="flex-1 py-4 border-2 border-orange-500 text-orange-600 rounded-2xl font-bold hover:bg-orange-50 transition-all active:scale-95 disabled:opacity-50"
-          >
-            🛒 เพิ่มลงตะกร้า
-          </button>
-          <button 
-            disabled={isUploading}
-            onClick={() => handleSubmit('DIRECT')}
-            className="flex-[1.5] py-4 bg-green-600 text-white rounded-2xl font-bold shadow-lg shadow-green-100 hover:bg-green-700 transition-all active:scale-95 disabled:opacity-50"
-          >
-            {isUploading ? "กำลังประมวลผล..." : "ส่งคำขอจัดซื้อทันที"}
-          </button>
-        </div>
+            <h3 className="font-bold text-gray-800 text-lg mb-1 leading-tight">{product.name}</h3>
+            <p className="text-gray-400 text-xs mb-4">หน่วย: {product.unit}</p>
+
+            <div className="mt-auto space-y-4">
+              <div className="flex items-center justify-between bg-gray-50 p-2 rounded-xl border border-gray-100">
+                <button 
+                  onClick={() => handleQuantityChange(product.id, (quantities[product.id] || 1) - 1)}
+                  className="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm font-bold text-gray-600 hover:bg-gray-100"
+                >
+                  -
+                </button>
+                <span className="font-bold text-gray-800">{quantities[product.id] || 1}</span>
+                <button 
+                  onClick={() => handleQuantityChange(product.id, (quantities[product.id] || 1) + 1)}
+                  className="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm font-bold text-gray-600 hover:bg-gray-100"
+                >
+                  +
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => onAddToCart(prepareOrderItem(product))}
+                  className="py-2.5 bg-gray-100 text-gray-600 rounded-xl font-bold text-xs hover:bg-gray-200 transition-colors"
+                >
+                  ใส่ตะกร้า
+                </button>
+                <button
+                  onClick={() => onCreateOrder(prepareOrderItem(product))}
+                  className="py-2.5 bg-green-600 text-white rounded-xl font-bold text-xs hover:bg-green-700 transition-colors shadow-lg shadow-green-100"
+                >
+                  สั่งซื้อทันที
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
