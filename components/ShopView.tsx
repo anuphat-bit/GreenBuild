@@ -15,15 +15,24 @@ const PRODUCTS = [
 const ShopView: React.FC<ShopViewProps> = ({ onAddToCart, onCreateOrder }) => {
   const [qtys, setQtys] = useState<{[key: string]: number}>({});
 
-  const prepareItem = (p: typeof PRODUCTS[0]): OrderItem => ({
-    id: `ORD-${Date.now()}`,
+  // ✅ แก้ไขส่วน prepareItem ในไฟล์ ShopView.tsx
+const prepareItem = (p: typeof PRODUCTS[0]): OrderItem => {
+  const newItem = {
+    // เพิ่มสุ่มตัวเลขข้างหลัง id เพื่อป้องกัน id ซ้ำกันเป๊ะๆ
+    id: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     name: p.name,
     amount: qtys[p.id] || 1,
     unit: p.unit,
     isGreen: p.isGreen,
     status: OrderStatus.PENDING,
     requestedAt: new Date().toISOString()
-  });
+  };
+  
+  // เพิ่มบรรทัดนี้เพื่อ Check ในหน้าจอ Console (F12)
+  console.log("กำลังเตรียมส่งสินค้าชิ้นเดียว:", newItem);
+  
+  return newItem as OrderItem;
+};
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
