@@ -53,7 +53,7 @@ const App: React.FC = () => {
     loadData();
   }, []);
 
-  // Sync เฉพาะตะกร้าลง LocalStorage (เพราะไม่ต้องลง Sheet จนกว่าจะสั่งซื้อ)
+  // Sync เฉพาะตะกร้าลง LocalStorage
   useEffect(() => {
     if (isDataLoaded) {
       localStorage.setItem('greenbuild_cart', JSON.stringify(cart));
@@ -78,9 +78,8 @@ const App: React.FC = () => {
 
   const handleCreateOrder = async (newOrders: OrderItem[]) => {
     setIsSyncing(true);
-    // บันทึกลง Local ทันทีเพื่อความเร็ว
     setOrders(prev => [...prev, ...newOrders]);
-    // ส่งขึ้น Google Sheets
+    localStorage.setItem('greenbuild_orders', JSON.stringify([...orders, ...newOrders]));
     await GoogleSheetService.createOrders(newOrders);
     setIsSyncing(false);
   };
@@ -103,10 +102,11 @@ const App: React.FC = () => {
       billId: billId
     }));
 
-    setOrders(prev => [...prev, ...checkoutItems]);
+    const updatedOrders = [...orders, ...checkoutItems];
+    setOrders(updatedOrders);
+    localStorage.setItem('greenbuild_orders', JSON.stringify(updatedOrders));
     setCart([]);
     
-    // ส่งขึ้น Google Sheets
     await GoogleSheetService.createOrders(checkoutItems);
     setIsSyncing(false);
     return billId;
@@ -114,10 +114,10 @@ const App: React.FC = () => {
 
   const handleUpdateOrder = async (orderId: string, updates: Partial<OrderItem>) => {
     setIsSyncing(true);
-    // อัปเดตใน UI
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
+    const updated = orders.map(o => o.id === orderId ? { ...o, ...updates } : o);
+    setOrders(updated);
+    localStorage.setItem('greenbuild_orders', JSON.stringify(updated));
     
-    // ส่งขึ้น Google Sheets
     if (updates.status) {
       await GoogleSheetService.updateOrder(
         orderId, 
@@ -134,7 +134,7 @@ const App: React.FC = () => {
       <div className="h-screen flex items-center justify-center bg-white">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-green-600 font-bold animate-pulse">กำลังเชื่อมต่อฐานข้อมูล...</p>
+          <p className="text-green-600 font-bold animate-pulse">GreenBuild กำลังเตรียมความพร้อม...</p>
         </div>
       </div>
     );
@@ -151,8 +151,8 @@ const App: React.FC = () => {
       />
       
       {isSyncing && (
-        <div className="bg-orange-500 text-white text-[10px] text-center py-1 font-bold animate-pulse uppercase tracking-widest sticky top-16 z-40">
-          กำลังซิงค์ข้อมูลกับ Google Sheets...
+        <div className="bg-green-600 text-white text-[10px] text-center py-1 font-bold animate-pulse uppercase tracking-widest sticky top-16 z-40">
+          กำลังซิงค์ข้อมูลกับ Google Cloud Sheets...
         </div>
       )}
 
@@ -196,8 +196,8 @@ const App: React.FC = () => {
       </main>
 
       <footer className="bg-white border-t py-4 text-center text-gray-400 text-[10px] uppercase tracking-widest flex flex-col items-center gap-1">
-        <div>Google Sheets & Drive Integrated System</div>
-        <div className="text-[8px] opacity-50">Data synced to your workspace cloud</div>
+        <div>GreenBuild v1.0 • Sustainability System</div>
+        <div className="text-[8px] opacity-50">Data synchronized to your workspace cloud</div>
       </footer>
     </div>
   );

@@ -24,7 +24,6 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin, onBack }) => {
         setError('รหัสผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง (ตรวจสอบตัวพิมพ์เล็ก/ใหญ่)');
         setIsSubmitting(false);
       }
-      // หาก success เป็น true หน้าจอจะเปลี่ยนไปเองจากการทำงานของ App.tsx
     }, 600);
   };
 
@@ -99,7 +98,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin, onBack }) => {
         </form>
 
         <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-400 text-center uppercase tracking-widest font-medium">
-          Secure Login Protocol • v1.3 (AI Disabled)
+          Secure Login Protocol • v1.0 (GreenBuild)
         </div>
       </div>
     </div>
