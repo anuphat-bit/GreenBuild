@@ -5,7 +5,8 @@ import { OrderItem, ViewType } from '../types';
 interface CartViewProps {
   cartItems: OrderItem[];
   onRemoveItem: (id: string) => void;
-  onCheckout: () => string | undefined;
+  // Change onCheckout to return a Promise to match the handleCheckout function in App.tsx
+  onCheckout: () => Promise<string | undefined>;
   onContinueShopping: () => void;
   onNavigate?: (view: ViewType) => void;
 }
@@ -15,9 +16,10 @@ const CartView: React.FC<CartViewProps> = ({ cartItems, onRemoveItem, onCheckout
   const [successBillId, setSuccessBillId] = useState<string | null>(null);
   const [successItemCount, setSuccessItemCount] = useState(0);
 
-  const handleCheckoutProcess = () => {
+  // Update handleCheckoutProcess to be async and await the onCheckout call
+  const handleCheckoutProcess = async () => {
     const itemCount = cartItems.length;
-    const billId = onCheckout();
+    const billId = await onCheckout();
     if (billId) {
       setSuccessBillId(billId);
       setSuccessItemCount(itemCount);
