@@ -26,9 +26,12 @@ export interface Product {
 
 export interface OrderItem {
   id: string;
+  billId: string; // เลขที่ใบสั่งซื้อ (กลุ่มของรายการ)
   productId: string;
   productName: string;
+  description?: string; // สเปคเพิ่มเติม
   quantity: number;
+  unit: string;
   isGreen: boolean;
   greenLabel?: GreenLabel;
   imageAttachment?: string; // base64
@@ -36,9 +39,9 @@ export interface OrderItem {
   status: OrderStatus;
   userId: string;
   userName: string;
-  department: string; // Added department field
+  department: string;
   adminComment?: string;
   finalPrice?: number;
 }
 
-export type ViewType = 'USER_SHOP' | 'USER_ORDERS' | 'USER_CART' | 'ADMIN_LOGIN' | 'ADMIN_DASHBOARD' | 'ADMIN_REPORTS';
+export type ViewType = 'USER_SHOP' | 'USER_TRACK' | 'USER_CART' | 'ADMIN_LOGIN' | 'ADMIN_DASHBOARD' | 'ADMIN_REPORTS';

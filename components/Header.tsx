@@ -36,7 +36,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, isAdmin, onLog
           <span className="text-lg font-bold text-gray-800 hidden lg:block group-hover:text-gray-600 transition-colors">GreenBuild</span>
         </div>
 
-        <nav className="flex items-center gap-1 md:gap-4 overflow-x-auto no-scrollbar scroll-smooth px-1 flex-1 md:flex-none">
+        <nav className="flex items-center gap-1 md:gap-2 overflow-x-auto no-scrollbar scroll-smooth px-1 flex-1 md:flex-none">
           {!isAdminView ? (
             <>
               <button 
@@ -46,10 +46,10 @@ const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, isAdmin, onLog
                 เลือกซื้อวัสดุ
               </button>
               <button 
-                onClick={() => onNavigate('USER_ORDERS')}
-                className={`px-3 py-2 rounded-xl transition-all whitespace-nowrap text-xs md:text-sm font-bold ${currentView === 'USER_ORDERS' ? 'bg-green-100 text-green-700' : 'text-gray-500 hover:bg-gray-50'}`}
+                onClick={() => onNavigate('USER_TRACK')}
+                className={`px-3 py-2 rounded-xl transition-all whitespace-nowrap text-xs md:text-sm font-bold ${currentView === 'USER_TRACK' ? 'bg-green-100 text-green-700' : 'text-gray-500 hover:bg-gray-50'}`}
               >
-                รายการของฉัน
+                ติดตามสถานะ
               </button>
             </>
           ) : (
@@ -105,10 +105,6 @@ const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, isAdmin, onLog
               แอดมิน
             </button>
           )}
-
-          <div className={`hidden xs:flex w-7 h-7 md:w-8 md:h-8 rounded-full border items-center justify-center font-bold text-[10px] md:text-xs transition-colors ${isAdminView ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
-            {isAdmin ? 'AD' : 'US'}
-          </div>
         </div>
       </div>
     </header>
