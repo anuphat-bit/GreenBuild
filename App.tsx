@@ -6,6 +6,7 @@ import UserOrdersView from './components/UserOrdersView';
 import AdminDashboard from './components/AdminDashboard';
 import { OrderItem, OrderStatus } from './types';
 
+// ตรวจสอบ URL นี้ให้ตรงกับใน SheetDB ของคุณ
 const SHEETDB_URL = 'https://sheetdb.io/api/v1/0zxc9i3e6gg1z';
 
 const App: React.FC = () => {
@@ -14,19 +15,23 @@ const App: React.FC = () => {
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
-  // 1. ดึงข้อมูลจาก Sheets (ยึดตามหน้าชีทเป็นหลัก)
+  // ✅ แก้จุดที่ 1: ฟังก์ชันดึงข้อมูล (เพิ่มตรรกะการเช็คข้อมูลให้ชัวร์ขึ้น)
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${SHEETDB_URL}?t=${Date.now()}`); // ป้องกัน Cache
+      const response = await fetch(`${SHEETDB_URL}?t=${Date.now()}`); // ใส่ timestamp กันแคช
       const data = await response.json();
+      
       if (Array.isArray(data)) {
-        // กรองแถวที่ไม่มีชื่อสินค้าออก (กัน Error)
-        const validData = data.filter(item => item.name);
+        // กรองข้อมูล: ต้องมีชื่อสินค้า (name) หรือ (Name) และต้องไม่ใช่แถวว่าง
+        const validData = data.filter(item => (item.name || item.Name) && item.id);
         setOrders(validData);
+        console.log("ดึงข้อมูลสำเร็จ:", validData);
+      } else {
+        setOrders([]);
       }
     } catch (error) {
-      console.error("Fetch error:", error);
+      console.error("ดึงข้อมูลจาก Sheets ไม่ได้:", error);
     } finally {
       setLoading(false);
     }
@@ -36,18 +41,19 @@ const App: React.FC = () => {
     fetchAllData();
   }, [fetchAllData]);
 
-  // 2. ฟังก์ชันส่งคำสั่งซื้อ (รองรับทั้งตะกร้าและสั่งทันที)
+  // ✅ แก้จุดที่ 2: ฟังก์ชันบันทึกข้อมูล (แก้ให้ส่งแบบ Array ชัวร์ๆ)
   const handleProcessOrder = async (orderItems: OrderItem[]) => {
-    const userName = localStorage.getItem('greenbuild_user_name') || 'Guest';
+    const userName = localStorage.getItem('greenbuild_user_name') || 'Guest User';
     const department = localStorage.getItem('greenbuild_department') || 'General';
 
+    // เตรียมข้อมูลให้ตรงกับหัวตารางใน Sheets (ตัวเล็กทั้งหมด)
     const dataToUpload = orderItems.map(item => ({
-      id: item.id || `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      id: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       timestamp: new Date().toLocaleString('th-TH'),
       userName: userName,
       userId: department,
-      name: item.name,      // ชื่อสินค้า
-      amount: item.amount,  // จำนวน
+      name: item.name,      // ชื่อคอลัมน์ต้องตรงกับใน Sheets
+      amount: item.amount,  // ชื่อคอลัมน์ต้องตรงกับใน Sheets
       unit: item.unit,
       category: item.isGreen ? 'GREEN' : 'NORMAL',
       status: 'PENDING',
@@ -55,6 +61,7 @@ const App: React.FC = () => {
     }));
 
     try {
+      // ⚠️ จุดตาย: ต้องส่งเป็น { "data": [ ... ] }
       const response = await fetch(SHEETDB_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -62,13 +69,16 @@ const App: React.FC = () => {
       });
 
       if (response.ok) {
-        alert('บันทึกข้อมูลลง Google Sheets สำเร็จ!');
-        setCart([]); 
-        await fetchAllData(); 
+        alert('บันทึกสำเร็จ! ข้อมูลกำลังลง Google Sheets');
+        setCart([]);
+        await fetchAllData(); // ดึงข้อมูลใหม่มาโชว์ทันที
         setCurrentView('USER_ORDERS');
+      } else {
+        const err = await response.json();
+        alert('API ปฏิเสธการบันทึก: ' + JSON.stringify(err));
       }
     } catch (error) {
-      alert('ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่');
+      alert('การเชื่อมต่ออินเทอร์เน็ตมีปัญหา');
     }
   };
 
@@ -88,12 +98,12 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header cartCount={cart.length} onNavigate={setCurrentView} currentView={currentView} />
-      {loading && <div className="fixed top-0 left-0 w-full h-1 bg-green-500 animate-pulse z-[200]" />}
+      {loading && <div className="fixed top-0 left-0 w-full h-1 bg-green-500 z-[200]" />}
       <main className="container mx-auto px-4 py-8">
         {currentView === 'SHOP' && (
           <ShopView 
             onAddToCart={(item) => setCart([...cart, item])} 
-            onCreateOrder={(item) => handleProcessOrder([item])} // ส่งเป็น Array [item]
+            onCreateOrder={(item) => handleProcessOrder([item])} // ส่งเป็น Array เสมอ
           />
         )}
         {currentView === 'CART' && (
