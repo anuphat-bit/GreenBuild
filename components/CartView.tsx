@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { OrderItem, ViewType } from '../types';
 
 interface CartViewProps {
@@ -15,6 +15,24 @@ const CartView: React.FC<CartViewProps> = ({ cartItems, onRemoveItem, onCheckout
   const [showConfirm, setShowConfirm] = useState(false);
   const [successBillId, setSuccessBillId] = useState<string | null>(null);
   const [successItemCount, setSuccessItemCount] = useState(0);
+  const [removingItems, setRemovingItems] = useState<string[]>([]);
+  const [animateTotal, setAnimateTotal] = useState(false);
+
+  useEffect(() => {
+    if (cartItems.length > 0) {
+      setAnimateTotal(true);
+      const timer = setTimeout(() => setAnimateTotal(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [cartItems.length]);
+
+  const handleRemoveClick = (id: string) => {
+    setRemovingItems(prev => [...prev, id]);
+    setTimeout(() => {
+      onRemoveItem(id);
+      setRemovingItems(prev => prev.filter(itemId => itemId !== id));
+    }, 300);
+  };
 
   // Update handleCheckoutProcess to be async and await the onCheckout call
   const handleCheckoutProcess = async () => {
@@ -76,15 +94,26 @@ const CartView: React.FC<CartViewProps> = ({ cartItems, onRemoveItem, onCheckout
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-4">
           {cartItems.map((item) => (
-            <div key={item.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex gap-4">
-              <div className="w-14 h-14 rounded-xl shrink-0 flex items-center justify-center text-2xl bg-gray-50">{item.isGreen ? '🌱' : '📦'}</div>
+            <div 
+              key={item.id} 
+              className={`bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex gap-4 transition-all duration-300 ${
+                removingItems.includes(item.id) ? 'opacity-0 translate-x-8 scale-95' : 'opacity-100 translate-x-0 scale-100'
+              }`}
+            >
+              <div className="w-14 h-14 rounded-xl shrink-0 flex items-center justify-center text-2xl bg-gray-50 overflow-hidden">
+                {item.imageAttachment ? (
+                  <img src={item.imageAttachment} alt={item.productName} className="w-full h-full object-cover" />
+                ) : (
+                  item.isGreen ? '🌱' : '📦'
+                )}
+              </div>
               <div className="flex-grow">
                 <div className="flex justify-between">
                   <div>
                     <h3 className="font-bold text-gray-800">{item.productName}</h3>
                     <p className="text-sm text-gray-500">จำนวน: <span className="font-bold text-gray-800">{item.quantity} {item.unit}</span></p>
                   </div>
-                  <button onClick={() => onRemoveItem(item.id)} className="text-gray-300 hover:text-red-500 transition-colors">ลบ</button>
+                  <button onClick={() => handleRemoveClick(item.id)} className="text-gray-300 hover:text-red-500 transition-colors">ลบ</button>
                 </div>
               </div>
             </div>
@@ -95,7 +124,9 @@ const CartView: React.FC<CartViewProps> = ({ cartItems, onRemoveItem, onCheckout
             <h2 className="text-xl font-bold text-gray-900 mb-6">สรุปคำสั่งซื้อ</h2>
             <div className="flex justify-between mb-8">
               <span className="text-gray-500">จำนวนทั้งหมด</span>
-              <span className="font-bold">{cartItems.length} รายการ</span>
+              <span className={`font-bold transition-all duration-300 inline-block ${animateTotal ? 'text-green-600 scale-110' : 'text-gray-900 scale-100'}`}>
+                {cartItems.length} รายการ
+              </span>
             </div>
             <button onClick={() => setShowConfirm(true)} className="w-full py-4 bg-green-600 text-white rounded-2xl font-bold text-lg hover:bg-green-700 shadow-lg transition-all">ยืนยันการสั่งซื้อ</button>
           </div>
