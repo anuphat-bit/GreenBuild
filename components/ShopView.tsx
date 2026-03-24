@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { OrderItem, OrderStatus, GreenLabel, ViewType } from '../types';
 
@@ -18,6 +17,7 @@ const DEPARTMENTS = [
 ];
 
 const ShopView: React.FC<ShopViewProps> = ({ onCreateOrder, onAddToCart, onNavigate }) => {
+  // --- States ---
   const [userName, setUserName] = useState('');
   const [department, setDepartment] = useState(DEPARTMENTS[0]);
   const [productName, setProductName] = useState('');
@@ -32,6 +32,18 @@ const ShopView: React.FC<ShopViewProps> = ({ onCreateOrder, onAddToCart, onNavig
   const [submitType, setSubmitType] = useState<'DIRECT' | 'CART'>('DIRECT');
   const [lastGeneratedId, setLastGeneratedId] = useState<string | null>(null);
 
+  // --- ฟังก์ชันล้างข้อมูลในฟอร์มทั้งหมด (จุดที่แก้ไข) ---
+  const resetForm = () => {
+    setUserName(''); // ล้างชื่อผู้สั่ง
+    setDepartment(DEPARTMENTS[0]); // ล้างแผนกกลับเป็นค่าเริ่มต้น
+    setProductName('');
+    setDescription('');
+    setQuantity(1);
+    setUnit('');
+    setIsGreen(false);
+    setImage(null);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -44,7 +56,10 @@ const ShopView: React.FC<ShopViewProps> = ({ onCreateOrder, onAddToCart, onNavig
   const handleInitiateSubmit = (e: React.FormEvent, type: 'DIRECT' | 'CART') => {
     e.preventDefault();
     if (department === DEPARTMENTS[0]) { alert('กรุณาเลือกแผนก / ฝ่าย'); return; }
-    if (!userName.trim() || !productName.trim() || !quantity || !unit.trim()) { alert('กรุณากรอกข้อมูลที่จำเป็น (*) ให้ครบถ้วน'); return; }
+    if (!userName.trim() || !productName.trim() || !quantity || !unit.trim()) { 
+      alert('กรุณากรอกข้อมูลที่จำเป็น (*) ให้ครบถ้วน'); 
+      return; 
+    }
     setSubmitType(type);
     setShowConfirm(true);
   };
@@ -79,20 +94,10 @@ const ShopView: React.FC<ShopViewProps> = ({ onCreateOrder, onAddToCart, onNavig
       if (submitType === 'DIRECT') {
         onCreateOrder([newItem]);
         setLastGeneratedId(billId);
-        setProductName('');
-        setDescription('');
-        setQuantity(1);
-        setUnit('');
-        setIsGreen(false);
-        setImage(null);
+        resetForm(); // เรียกใช้ฟังก์ชันล้างข้อมูลทั้งหมดที่นี่
       } else if (onAddToCart) {
         onAddToCart(newItem);
-        setProductName('');
-        setDescription('');
-        setQuantity(1);
-        setUnit('');
-        setIsGreen(false);
-        setImage(null);
+        resetForm(); // เรียกใช้ฟังก์ชันล้างข้อมูลทั้งหมดที่นี่
         alert('เพิ่มลงตะกร้าเรียบร้อยแล้ว');
       }
       setIsSubmitting(false);
@@ -115,7 +120,8 @@ const ShopView: React.FC<ShopViewProps> = ({ onCreateOrder, onAddToCart, onNavig
       </div>
 
       <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden relative">
-        <form className="p-8 space-y-8">
+        {/* เพิ่ม autoComplete="off" เพื่อป้องกัน Browser จำค่าเก่ามาเติมเอง */}
+        <form className="p-8 space-y-8" autoComplete="off">
           <section className="space-y-4">
             <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
               <span className="text-xl">👤</span>
@@ -124,11 +130,22 @@ const ShopView: React.FC<ShopViewProps> = ({ onCreateOrder, onAddToCart, onNavig
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อ-นามสกุล ผู้สั่งซื้อ *</label>
-                <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all" required />
+                <input 
+                  type="text" 
+                  value={userName} 
+                  onChange={(e) => setUserName(e.target.value)} 
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all" 
+                  required 
+                />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">แผนก / ฝ่าย *</label>
-                <select value={department} onChange={(e) => setDepartment(e.target.value)} className={`w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all cursor-pointer ${department === DEPARTMENTS[0] ? 'bg-gray-50 text-gray-400' : 'bg-white text-gray-900'}`} required >
+                <select 
+                  value={department} 
+                  onChange={(e) => setDepartment(e.target.value)} 
+                  className={`w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all cursor-pointer ${department === DEPARTMENTS[0] ? 'bg-gray-50 text-gray-400' : 'bg-white text-gray-900'}`} 
+                  required 
+                >
                   {DEPARTMENTS.map((dept, index) => <option key={dept} value={dept} disabled={index === 0}>{dept}</option>)}
                 </select>
               </div>
