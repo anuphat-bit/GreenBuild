@@ -1,74 +1,44 @@
+import { OrderItem, OrderStatus } from '../types';
 
-import { OrderItem } from '../types';
-
-// ใส่ URL ที่ได้จากการ Deploy Google Apps Script Web App
-const GAS_WEB_APP_URL = 'YOUR_GAS_WEB_APP_URL_HERE';
+// *** ใส่ URL ของ Google Apps Script ที่คุณ Deploy ได้จาก Google Sheets ***
+const API_URL = 'YOUR_GOOGLE_APPS_SCRIPT_URL'; 
 
 export const GoogleSheetService = {
-  async fetchOrders(): Promise<OrderItem[]> {
-    if (GAS_WEB_APP_URL.includes('YOUR_GAS')) return [];
+  // ดึงข้อมูล: เพิ่ม ?t= เพื่อป้องกัน Browser จำค่าเก่า
+  fetchOrders: async (): Promise<OrderItem[]> => {
     try {
-      const response = await fetch(GAS_WEB_APP_URL);
-      const data = await response.json();
-      // แมพข้อมูลจาก Sheet กลับเป็น OrderItem Object
-      return data.map((row: any) => ({
-        billId: row["billId"] || row["Bill ID"],
-        id: row["id"] || row["Item ID"],
-        requestedAt: row["requestedAt"] || row["Date"],
-        userName: row["userName"] || row["Name"],
-        department: row["department"] || row["Dept"],
-        productName: row["productName"] || row["Product"],
-        quantity: Number(row["quantity"] || row["Qty"]),
-        unit: row["unit"] || row["Unit"],
-        isGreen: row["isGreen"] === true || row["isGreen"] === "TRUE",
-        greenLabel: row["greenLabel"],
-        description: row["description"],
-        imageAttachment: row["imageUrl"], // ใน Sheet จะเก็บเป็น URL ของ Drive
-        status: row["status"],
-        finalPrice: Number(row["finalPrice"] || 0),
-        adminComment: row["adminComment"]
-      }));
+      const response = await fetch(`${API_URL}?t=${Date.now()}`, {
+        method: 'GET',
+        cache: 'no-store' // บังคับไม่ให้เก็บ cache
+      });
+      return await response.json();
     } catch (error) {
-      console.error('Error fetching from Google Sheets:', error);
+      console.error("Fetch error:", error);
       return [];
     }
   },
 
-  async createOrders(orders: OrderItem[]): Promise<boolean> {
-    if (GAS_WEB_APP_URL.includes('YOUR_GAS')) return false;
+  // ส่งข้อมูลใหม่: ส่งขึ้น Cloud ทันที
+  createOrders: async (orders: OrderItem[]) => {
     try {
-      const response = await fetch(GAS_WEB_APP_URL, {
+      await fetch(API_URL, {
         method: 'POST',
-        mode: 'no-cors', // GAS ต้องการ no-cors สำหรับการ POST แบบง่าย
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'createOrder', data: orders })
+        body: JSON.stringify(orders),
       });
-      return true;
     } catch (error) {
-      console.error('Error saving to Google Sheets:', error);
-      return false;
+      console.error("Create error:", error);
     }
   },
 
-  async updateOrder(orderId: string, status: string, finalPrice: number, adminComment: string): Promise<boolean> {
-    if (GAS_WEB_APP_URL.includes('YOUR_GAS')) return false;
+  // อัปเดตสถานะ (สำหรับ Admin): ส่งไปเปลี่ยนค่าใน Sheet
+  updateOrder: async (id: string, status: OrderStatus, price: number, comment: string) => {
     try {
-      await fetch(GAS_WEB_APP_URL, {
+      await fetch(API_URL, {
         method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'updateOrder', 
-          orderId, 
-          status, 
-          finalPrice, 
-          adminComment 
-        })
+        body: JSON.stringify({ action: 'UPDATE', id, status, price, comment }),
       });
-      return true;
     } catch (error) {
-      console.error('Error updating Google Sheets:', error);
-      return false;
+      console.error("Update error:", error);
     }
   }
 };
