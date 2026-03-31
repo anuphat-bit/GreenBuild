@@ -1,7 +1,7 @@
 import { OrderItem, OrderStatus } from '../types';
 
 // *** ใส่ URL ของ Google Apps Script ที่คุณ Deploy ได้จาก Google Sheets ***
-const API_URL = 'YOUR_GOOGLE_APPS_SCRIPT_URL'; 
+const API_URL = 'https://script.google.com/a/macros/lawasri.tru.ac.th/s/AKfycby83_xi262iSGQUnadikpkj38iTwOLwvmePGxCLCirN8mwpneZZKXYG7fn3UVtcvQyh/exec'; 
 
 export const GoogleSheetService = {
   // ดึงข้อมูล: เพิ่ม ?t= เพื่อป้องกัน Browser จำค่าเก่า
