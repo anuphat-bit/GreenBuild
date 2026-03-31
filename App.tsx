@@ -17,40 +17,30 @@ const App: React.FC = () => {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // --- 1. ฟังก์ชันโหลดข้อมูล (ปรับปรุงเพื่อลดการค้าง) ---
+  // --- 1. ฟังก์ชันโหลดข้อมูล (ดึงจาก Cloud เป็นหลัก) ---
   const loadData = useCallback(async () => {
     setIsSyncing(true);
     try {
-      // ดึงข้อมูลสดจาก Google Sheets ก่อนเสมอ
+      // ดึงข้อมูลสดจาก Google Sheets
       const sheetOrders = await GoogleSheetService.fetchOrders();
       
-      if (sheetOrders && sheetOrders.length > 0) {
+      if (sheetOrders) {
         setOrders(sheetOrders);
-        // อัปเดต Backup ในเครื่องให้ตรงกับ Cloud
+        // เก็บลง LocalStorage ไว้แค่สำรองเผื่อเน็ตหลุดเท่านั้น
         localStorage.setItem('greenbuild_orders', JSON.stringify(sheetOrders));
-      } else {
-        // ถ้าใน Cloud ว่างเปล่า ให้ลองดูว่าในเครื่องมีไหม
-        const savedOrders = localStorage.getItem('greenbuild_orders');
-        if (savedOrders) {
-          setOrders(JSON.parse(savedOrders));
-        }
       }
     } catch (error) {
-      console.error("Error syncing with Google Sheets:", error);
-      // ถ้า Error (เช่น เน็ตหลุด) ให้ดึงจาก LocalStorage แทน
+      console.error("Sync Error:", error);
       const savedOrders = localStorage.getItem('greenbuild_orders');
       if (savedOrders) setOrders(JSON.parse(savedOrders));
     }
 
-    // โหลดข้อมูลตะกร้าสินค้า
+    // โหลดตะกร้า (อันนี้แยกตามเครื่อง ถูกต้องแล้ว)
     const savedCart = localStorage.getItem('greenbuild_cart');
     if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch (e) { setCart([]); }
+      try { setCart(JSON.parse(savedCart)); } catch (e) { setCart([]); }
     }
 
-    // ตรวจสอบสถานะ Admin
     const auth = sessionStorage.getItem('admin_auth');
     if (auth === 'true') setIsAdminAuthenticated(true);
     
@@ -58,49 +48,51 @@ const App: React.FC = () => {
     setIsSyncing(false);
   }, []);
 
+  // โหลดครั้งแรกตอนเปิดแอป
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // --- 2. Sync ตะกร้าลงเครื่องอัตโนมัติ ---
+  // --- 2. ใหม่! ดึงข้อมูลใหม่ทุกครั้งที่เปลี่ยนหน้าจอ ---
+  useEffect(() => {
+    if (isDataLoaded) {
+      loadData();
+    }
+  }, [currentView]); // เมื่อหน้าจอเปลี่ยน ข้อมูลจะถูกดึงใหม่ทันที
+
   useEffect(() => {
     if (isDataLoaded) {
       localStorage.setItem('greenbuild_cart', JSON.stringify(cart));
     }
   }, [cart, isDataLoaded]);
 
-  // --- 3. ฟังก์ชันจัดการคำสั่งซื้อ ---
-  const handleCreateOrder = async (newOrders: OrderItem[]) => {
-    setIsSyncing(true);
-    const updatedOrders = [...orders, ...newOrders];
-    setOrders(updatedOrders);
-    localStorage.setItem('greenbuild_orders', JSON.stringify(updatedOrders));
-    
-    await GoogleSheetService.createOrders(newOrders);
-    setIsSyncing(false);
-  };
-
+  // --- 3. ฟังก์ชันจัดการคำสั่งซื้อ (ปรับให้รอ Cloud) ---
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     
     setIsSyncing(true);
     const billId = `BILL-${Date.now()}`;
-    const checkoutItems = cart.map(item => ({
-      ...item,
-      billId: billId
-    }));
+    const checkoutItems = cart.map(item => ({ ...item, billId: billId }));
 
-    const updatedOrders = [...orders, ...checkoutItems];
-    setOrders(updatedOrders);
-    localStorage.setItem('greenbuild_orders', JSON.stringify(updatedOrders));
-    setCart([]); // ล้างตะกร้าหลังสั่งซื้อ
-    
-    await GoogleSheetService.createOrders(checkoutItems);
-    setIsSyncing(false);
-    return billId;
+    try {
+      // 1. ส่งขึ้น Cloud
+      await GoogleSheetService.createOrders(checkoutItems);
+      
+      // 2. ล้างตะกร้า
+      setCart([]);
+      localStorage.removeItem('greenbuild_cart');
+
+      // 3. บังคับโหลดข้อมูลใหม่จาก Cloud เพื่อให้เห็นออเดอร์ที่เราเพิ่งสั่งไป
+      await loadData(); 
+      
+      setIsSyncing(false);
+      return billId;
+    } catch (error) {
+      alert("ไม่สามารถบันทึกข้อมูลได้ โปรดตรวจสอบอินเทอร์เน็ต");
+      setIsSyncing(false);
+    }
   };
 
-  // --- 4. ฟังก์ชัน Admin & Reset ---
   const handleAdminLogin = (id: string, code: string): boolean => {
     if (id === 'admin' && code === 'green1234') {
       setIsAdminAuthenticated(true);
@@ -117,22 +109,20 @@ const App: React.FC = () => {
     setCurrentView('USER_SHOP');
   };
 
-  // ฟังก์ชันพิเศษสำหรับล้างค่าที่ค้างในเครื่อง (กดใช้เมื่อข้อมูลรวน)
   const handleHardReset = () => {
-    if (window.confirm("คุณต้องการล้างข้อมูลแคชในเครื่องทั้งหมดใช่หรือไม่?")) {
+    if (window.confirm("ต้องการล้างแคชทั้งหมดใช่หรือไม่?")) {
       localStorage.clear();
       sessionStorage.clear();
       window.location.reload();
     }
   };
 
-  // --- 5. Render Logic ---
   if (!isDataLoaded) {
     return (
       <div className="h-screen flex items-center justify-center bg-white">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-green-600 font-bold animate-pulse">GreenBuild กำลังเตรียมความพร้อม...</p>
+          <p className="text-green-600 font-bold">GreenBuild กำลังซิงค์ข้อมูล...</p>
         </div>
       </div>
     );
@@ -149,15 +139,19 @@ const App: React.FC = () => {
       />
       
       {isSyncing && (
-        <div className="bg-green-600 text-white text-[10px] text-center py-1 font-bold animate-pulse uppercase tracking-widest sticky top-16 z-40">
-          กำลังซิงค์ข้อมูลกับระบบ Cloud...
+        <div className="bg-green-600 text-white text-[10px] text-center py-1 font-bold animate-pulse sticky top-16 z-40">
+          กำลังอัปเดตข้อมูลจากระบบส่วนกลาง (Google Sheets)...
         </div>
       )}
 
       <main className="flex-grow container mx-auto px-4 py-6">
         {currentView === 'USER_SHOP' && (
           <ShopView 
-            onCreateOrder={handleCreateOrder} 
+            onCreateOrder={async (newOrders) => {
+              setIsSyncing(true);
+              await GoogleSheetService.createOrders(newOrders);
+              await loadData();
+            }} 
             onAddToCart={(item) => setCart(prev => [...prev, item])}
             onNavigate={setCurrentView}
           />
@@ -187,11 +181,12 @@ const App: React.FC = () => {
             {currentView === 'ADMIN_DASHBOARD' && (
               <AdminDashboard 
                 orders={orders} 
-                onUpdateOrder={(id, updates) => {
-                  const updated = orders.map(o => o.id === id ? { ...o, ...updates } : o);
-                  setOrders(updated);
-                  // อัปเดตไปยัง Cloud (สมมติว่าใช้ GoogleSheetService.updateOrder)
-                  if (updates.status) GoogleSheetService.updateOrder(id, updates.status, updates.finalPrice || 0, updates.adminComment || '');
+                onUpdateOrder={async (id, updates) => {
+                  setIsSyncing(true);
+                  if (updates.status) {
+                    await GoogleSheetService.updateOrder(id, updates.status, updates.finalPrice || 0, updates.adminComment || '');
+                    await loadData(); // โหลดใหม่เพื่อให้หน้าจอแอดมินอัปเดตสถานะล่าสุดจาก Cloud
+                  }
                 }} 
               />
             )}
@@ -200,13 +195,10 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="bg-white border-t py-4 text-center text-gray-400 text-[10px] uppercase tracking-widest flex flex-col items-center gap-1">
-        <div>GreenBuild v1.0 • Sustainability System</div>
-        <button 
-          onClick={handleHardReset}
-          className="mt-2 text-[8px] border border-gray-200 px-2 py-1 rounded hover:bg-gray-50"
-        >
-          Reset Local Cache
+      <footer className="bg-white border-t py-4 text-center text-gray-400 text-[10px] flex flex-col items-center gap-1">
+        <div>GreenBuild v1.1 • Centralized Sync System</div>
+        <button onClick={handleHardReset} className="mt-2 border border-gray-200 px-2 py-1 rounded">
+          ล้างข้อมูลที่ค้างในเบราว์เซอร์
         </button>
       </footer>
     </div>
