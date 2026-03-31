@@ -1,120 +1,137 @@
-import React, { useState } from 'react';
-import { ViewType, OrderItem } from '../types';
+import React, { useState, useMemo } from 'react';
+import { OrderItem } from '../types';
+import { GoogleSheetService } from '../services/googleSheetService';
 
-interface UserTrackViewProps {
+interface TrackOrderViewProps {
   orders: OrderItem[];
-  onNavigate?: (view: ViewType) => void;
 }
 
-const UserTrackView: React.FC<UserTrackViewProps> = ({ orders, onNavigate }) => {
-  const [searchQuery, setSearchQuery] = useState('');
+const TrackOrderView: React.FC<TrackOrderViewProps> = ({ orders }) => {
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // --- คำนวณ Sustainability Score ---
-  // สมมติว่าคะแนนมาจากการเปรียบเทียบรายการที่เป็น Green เทียบกับทั้งหมด
-  const totalItems = orders.length;
-  const greenItems = orders.filter(item => item.isGreen).length;
-  const sustainabilityPercent = totalItems > 0 ? Math.round((greenItems / totalItems) * 100) : 0;
+  // --- 1. ส่วนคำนวณ Sustainability Score (Sync กับ Cloud) ---
+  const sustainabilityStats = useMemo(() => {
+    // กรองเอาเฉพาะออเดอร์ที่ไม่ใช่ REJECTED มาคำนวณคะแนน
+    const activeOrders = orders.filter(o => o.status !== 'REJECTED');
+    const total = activeOrders.length;
+    const green = activeOrders.filter(o => o.isGreen).length;
+    const ratio = total > 0 ? (green / total) * 100 : 0;
 
-  // กรองรายการตามการค้นหา (Bill ID หรือ ชื่อผู้สั่ง)
-  const filteredOrders = orders.filter(order => 
-    order.billId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.userName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+    // กำหนด Tier ตามสัดส่วนสินค้ากรีน
+    let tier = "Green Starter";
+    let tierColor = "text-gray-400";
+    let icon = "🌱";
+    if (ratio >= 80) { 
+      tier = "Sustainability Champion"; tierColor = "text-emerald-600"; icon = "🏆";
+    } else if (ratio >= 50) { 
+      tier = "Eco Explorer"; tierColor = "text-green-500"; icon = "🌲";
+    } else if (ratio > 0) { 
+      tier = "Green Starter"; tierColor = "text-emerald-400"; icon = "🌱";
+    }
+
+    return { total, green, ratio, tier, tierColor, icon };
+  }, [orders]); // คำนวณใหม่ทุกครั้งที่ข้อมูล orders อัปเดตจาก Cloud
+
+  // --- 2. ส่วน Logic การค้นหาออเดอร์ ---
+  const filteredOrders = useMemo(() => {
+    if (!searchTerm.trim()) return [];
+    const lowerSearch = searchTerm.toLowerCase();
+    // ค้นหาจาก Bill ID หรือ ชื่อผู้สั่ง
+    return orders.filter(order => 
+      (order.billId && order.billId.toLowerCase().includes(lowerSearch)) ||
+      (order.userName && order.userName.toLowerCase().includes(lowerSearch))
+    ).sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+  }, [orders, searchTerm]);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-700 px-4 pb-20">
-      {/* Header Section */}
-      <div className="text-center space-y-3 py-6">
-        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">ติดตามสถานะการจัดซื้อ</h1>
-        <p className="text-gray-500 font-medium">ตรวจสอบความคืบหน้าและคะแนนความยั่งยืนของคุณ</p>
+    <div className="space-y-10 animate-in fade-in duration-500 pb-12">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-gray-800">ติดตามสถานะการจัดซื้อ</h1>
+        <p className="text-gray-500 mt-2 text-sm">ตรวจสอบความคืบหน้าและคะแนนความยั่งยืนของคุณ</p>
       </div>
 
-      {/* --- 1. Sustainability Score Dashboard Card --- */}
-      <div className="bg-white rounded-[40px] p-8 md:p-10 shadow-xl shadow-gray-100 border border-gray-50 relative overflow-hidden">
-        <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
-          {/* Badge & Level Icon */}
-          <div className="relative">
-            <div className="w-32 h-32 rounded-full border-8 border-gray-50 flex items-center justify-center bg-white shadow-inner">
-              <span className="text-5xl">🌱</span>
+      {/* 🟢 ส่วนที่ 1: Sustainability Score Card (เหมือนในรูป) */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 flex items-center gap-8 relative overflow-hidden">
+        {/* 🌱 ไอคอนซ้ายมือ */}
+        <div className="w-28 h-28 rounded-full border-4 border-emerald-50 flex flex-col items-center justify-center bg-white shadow-inner shrink-0 gap-1">
+          <span className="text-5xl">{sustainabilityStats.icon}</span>
+          <span className="text-[10px] font-bold bg-emerald-500 text-white px-2 py-0.5 rounded-full uppercase tracking-widest">Active</span>
+        </div>
+
+        {/* 📊 รายละเอียดคะแนน */}
+        <div className="flex-grow space-y-4">
+          <div className="flex justify-between items-end">
+            <div>
+              <h2 className="text-xs font-bold text-emerald-600 uppercase tracking-widest">Sustainability Score</h2>
+              <div className="flex items-center gap-3">
+                {/* ดึงคะแนน % มาแสดงสดๆ */}
+                <span className="text-4xl font-bold text-gray-800">{sustainabilityStats.ratio.toFixed(0)}%</span>
+                <span className={`text-sm font-bold ${sustainabilityStats.tierColor}`}>{sustainabilityStats.tier}</span>
+              </div>
             </div>
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-green-500 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg uppercase tracking-tighter">
-              Active
+            {/* แสดงสัดส่วน 0 / 0 */}
+            <div className="text-right text-gray-500 text-sm">
+              <span className="text-2xl font-semibold text-gray-800">{sustainabilityStats.green} / {sustainabilityStats.total}</span>
+              <div className="text-xs font-medium text-gray-400">รายการกรีน</div>
             </div>
           </div>
 
-          {/* Progress Info */}
-          <div className="flex-grow w-full space-y-4">
-            <div className="flex justify-between items-end">
-              <div>
-                <span className="block text-[10px] font-bold text-green-600 uppercase tracking-widest mb-1">Sustainability Score</span>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-5xl font-black text-gray-900">{sustainabilityPercent}%</span>
-                  <span className="text-xl font-bold text-green-500">Green Starter</span>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="text-2xl font-bold text-gray-900">{greenItems} / {totalItems}</span>
-                <p className="text-[10px] font-bold text-gray-400 uppercase">รายการกรีน</p>
-              </div>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="h-4 bg-gray-100 rounded-full overflow-hidden p-1">
-              <div 
-                className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000 ease-out"
-                style={{ width: `${sustainabilityPercent}%` }}
-              ></div>
+          {/* ➖ Progress Bar */}
+          <div className="relative w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+            <div 
+              className="absolute top-0 left-0 h-full bg-emerald-500 transition-all duration-1000 ease-out rounded-full"
+              style={{ width: `${sustainabilityStats.ratio}%` }}
+            >
+              <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* --- 2. Search Bar Section --- */}
+      {/* 🔍 ส่วนที่ 2: ช่องค้นหาออเดอร์ */}
       <div className="relative group">
-        <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-gray-400 group-focus-within:text-green-500 transition-colors">
-          <span className="text-xl">🔍</span>
-        </div>
         <input 
           type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="กรอกเลขใบสั่งซื้อ (Bill ID) หรือชื่อผู้สั่ง..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-14 pr-6 py-6 bg-white border-2 border-transparent shadow-lg rounded-3xl outline-none focus:border-green-500/20 focus:ring-4 focus:ring-green-500/5 transition-all text-lg font-medium text-gray-700 placeholder:text-gray-300"
+          className="w-full px-6 py-4 rounded-full border border-gray-100 bg-white shadow-sm focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition-all text-sm pl-14"
         />
+        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 text-xl group-focus-within:text-emerald-500 transition-colors">
+          🔍
+        </span>
+        <button 
+          className="absolute right-3 top-1/2 -translate-y-1/2 bg-gray-50 hover:bg-emerald-50 text-gray-500 hover:text-emerald-600 w-10 h-10 rounded-full flex items-center justify-center transition-colors"
+        >
+          🔎
+        </button>
       </div>
 
-      {/* --- 3. Search Results / Empty State --- */}
-      <div className="bg-blue-50/50 rounded-[40px] border-2 border-dashed border-blue-100 p-12 text-center">
-        {searchQuery === '' ? (
+      {/* 📦 ส่วนที่ 3: แสดงผลการค้นหา (Empty State หรือ รายการออเดอร์) */}
+      <div className="min-h-[250px] bg-white rounded-3xl border border-gray-100 shadow-sm p-8 flex flex-col items-center justify-center text-center">
+        {!searchTerm.trim() ? (
+          // หน้าตาตอนยังไม่ได้ค้นหา (เหมือนในรูป)
           <div className="space-y-4">
-            <div className="text-4xl animate-pulse">💡</div>
-            <h3 className="text-xl font-bold text-blue-900">ค้นหาด้วยเลขที่ใบสั่งซื้อ</h3>
-            <p className="text-blue-500 text-sm max-w-xs mx-auto leading-relaxed">
-              ระบบจะแสดงข้อมูลแบบ Real-time จากระบบฐานข้อมูล เพื่อให้คุณติดตามสถานะได้ทันที
-            </p>
+            <div className="text-6xl animate-bounce">💡</div>
+            <h3 className="text-lg font-bold text-gray-800">ค้นหาด้วยเลขที่ใบสั่งซื้อ</h3>
+            <p className="text-xs text-blue-600 bg-blue-50 px-3 py-1 rounded-full font-medium">ระบบจะแสดงข้อมูลแบบ Real-time จาก Google Cloud</p>
           </div>
-        ) : filteredOrders.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 text-left">
-            {filteredOrders.map((order) => (
-              <div key={order.id} className="bg-white p-6 rounded-2xl shadow-sm border border-blue-50 flex justify-between items-center">
-                <div>
-                  <span className="text-[10px] font-bold text-blue-400 uppercase">{order.billId}</span>
-                  <h4 className="font-bold text-gray-800">{order.productName}</h4>
-                  <p className="text-xs text-gray-500">ผู้สั่ง: {order.userName}</p>
-                </div>
-                <div className="text-right">
-                  <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-600 uppercase">
-                    {order.status}
-                  </span>
-                  <p className="text-[10px] text-gray-400 mt-1">{new Date(order.requestedAt).toLocaleDateString('th-TH')}</p>
-                </div>
-              </div>
-            ))}
+        ) : filteredOrders.length === 0 ? (
+          // หน้าตาตอนค้นหาแล้วไม่เจอ
+          <div className="space-y-3 text-gray-500">
+            <div className="text-6xl">🤷‍♂️</div>
+            <p className="font-medium">ไม่พบข้อมูลใบสั่งซื้อ "{searchTerm}"</p>
+            <p className="text-xs">โปรดตรวจสอบ Bill ID หรือชื่อผู้สั่งอีกครั้ง</p>
           </div>
         ) : (
-          <div className="py-10">
-            <div className="text-4xl mb-4">🏜️</div>
-            <p className="text-gray-400 font-bold">ไม่พบข้อมูลที่ค้นหา</p>
+          // หน้าตาตอนเจอออเดอร์ (คุณสามารถนำ UserOrdersView ของคุณมาใส่ตรงนี้ได้)
+          <div className="w-full text-left space-y-4">
+            <p className="text-xs text-gray-400 mb-4">พบ {filteredOrders.length} รายการสำหรับ "{searchTerm}"</p>
+            {filteredOrders.map(order => (
+              <div key={order.id} className="border-b pb-3 text-sm text-gray-700">
+                [{order.status}] {order.productName} - {order.quantity} {order.unit} ({order.userName})
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -122,4 +139,4 @@ const UserTrackView: React.FC<UserTrackViewProps> = ({ orders, onNavigate }) => 
   );
 };
 
-export default UserTrackView;
+export default TrackOrderView;
